@@ -22,7 +22,7 @@ def search_regex type, key1, key2
       skip = true if lines[idx].strip.start_with?("/*") && !lines[idx].strip.end_with?("*/")
       skip = false if skip == true && lines[idx].strip.end_with?("*/")
       next if skip == true
-      data = lines[idx].strip.chomp if lines[idx].match(r2) && !lines[idx].strip.start_with?("//")
+      data = lines[idx].strip if lines[idx].match(r2) && !lines[idx].strip.start_with?("//")
       line_no = idx + 1
       match_lines.push([last.empty? ? "" : File.join($base_name, last), line_no, data.gsub("\"", "\"\"")]) if !data.nil?
       last = "" if last == file && !data.nil?
@@ -40,7 +40,7 @@ def search_xpath type, key1, key2
       doc.xpath(key1).each do |node|
         io.rewind
         line_no = node.line
-        line = io.readlines[line_no - 1].strip.chomp
+        line = io.readlines[line_no - 1].strip
         match_lines << [last.empty? ? "" : File.join($base_name, last), line_no, line]
         last = "" if last == file
       end
