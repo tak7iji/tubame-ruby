@@ -3,6 +3,8 @@
 require 'nokogiri'
 require 'csv'
 
+$base_name = File.split(Dir.getwd)[1]
+
 def search_regex type, key1, key2
   key2 = key1 if key2.empty?
   key1 = "[.]*" if key1 == key2
@@ -22,24 +24,25 @@ def search_regex type, key1, key2
       next if skip == true
       data = lines[idx].strip.chomp if lines[idx].match(r2) && !lines[idx].strip.start_with?("//")
       line_no = idx + 1
-      match_lines.push([last, line_no, data.gsub("\"", "\"\"")]) if !data.nil?
+      match_lines.push([last.empty? ? "" : File.join($base_name, last), line_no, data.gsub("\"", "\"\"")]) if !data.nil?
       last = "" if last == file && !data.nil?
     end if lines.select{|e| e.chomp.match(r1)}.size > 0
   end
   match_lines
 end
 
-
 def search_xpath type, key1, key2
   match_lines = []
   Dir.glob("**/#{type}").each do |file|
+    last = file
     open(file, "rt") do |io|
       doc = Nokogiri.XML(io.read)
       doc.xpath(key1).each do |node|
         io.rewind
         line_no = node.line
         line = io.readlines[line_no - 1].strip.chomp
-        match_lines << [file, line_no, line]
+        match_lines << [last.empty? ? "" : File.join($base_name, last), line_no, line]
+        last = "" if last == file
       end
     end
   end
