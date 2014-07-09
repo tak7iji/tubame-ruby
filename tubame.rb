@@ -2,6 +2,7 @@
 
 require 'nokogiri'
 require 'csv'
+require 'stringio'
 
 $base_name = File.split(Dir.getwd)[1]
 
@@ -18,11 +19,11 @@ def search_regex type, key1, key2
     count=0
     skip = false
     last = file
-    lines.each_index do |idx|
-      skip = true if lines[idx].strip.start_with?("/*") && !lines[idx].strip.end_with?("*/")
+    lines.each_with_index do |line, idx|
+      skip = true if line.strip.start_with?("/*") && !line.strip.end_with?("*/")
       skip = false if skip == true && lines[idx].strip.end_with?("*/")
       next if skip == true
-      data = lines[idx].strip if lines[idx].match(r2) && !lines[idx].strip.start_with?("//")
+      data = line.strip if line.match(r2) && !line.strip.start_with?("//")
       line_no = idx + 1
       match_lines.push([last.empty? ? "" : File.join($base_name, last), line_no, data.gsub("\"", "\"\"")]) if !data.nil?
       last = "" if last == file && !data.nil?
@@ -32,29 +33,24 @@ def search_regex type, key1, key2
 end
 
 def search_xpath type, key1, key2
-  match_lines = []
-  Dir.glob("**/#{type}").each do |file|
+  Dir.glob("**/#{type}").map do |file|
     last = file
-    open(file, "rt") do |io|
-      doc = Nokogiri.XML(io.read)
-      doc.xpath(key1).each do |node|
-        io.rewind
-        line_no = node.line
-        line = io.readlines[line_no - 1].strip
-        match_lines << [last.empty? ? "" : File.join($base_name, last), line_no, line]
-        last = "" if last == file
-      end
+    body = open(file, "rt") {|io| io.read}
+    Nokogiri.XML(body).xpath(key1).map do |node|
+      line_no = node.line
+      line = StringIO.new(body).readlines[line_no - 1].strip
+      match_lines = [last.empty? ? "" : File.join($base_name, last), line_no, line]
+      last = "" if last == file
+      match_lines
     end
-  end
-  match_lines
+  end.flatten 1
 end
 
-xml = Nokogiri.XML(open(ARGV[0]))
 csv = CSV.open('result.csv', "wb", :encoding => 'Shift_JIS')
 csv << ['ガイド章','検索手順','検索情報ID','ファイル名','行番号','コード内容']
 
-xml.remove_namespaces!
-xml.xpath('//ChapterCategoryRefKey').each do |e|
+xml = Nokogiri.XML(open(ARGV[0]))
+xml.remove_namespaces!.xpath('//ChapterCategoryRefKey').each do |e|
   chap_no = e.previous_element.text
   cat_key = e.text
   kh_key  = xml.xpath("//Category[@categoryId='#{cat_key}']/KnowhowRefKey").text
@@ -68,20 +64,15 @@ xml.xpath('//ChapterCategoryRefKey').each do |e|
     process = check_item.xpath('SearchProcess').text
     s_key = search_key
     xml.xpath("//SearchInfomation[@searchInfoId='#{search_key}']").each do |search_info|
-      type = search_info.xpath('FileType')[0].text
-      key1 = search_info.xpath('SearchKey1')[0].text
-      key2 = search_info.xpath('SearchKey2')[0].text
-      mod  = search_info.xpath('PythonModule')[0].text
+      proc = lambda do |f|
+        send f, search_info.xpath('FileType')[0].text,
+                search_info.xpath('SearchKey1')[0].text,
+                search_info.xpath('SearchKey2')[0].text
+      end
 
-      match_lines = search_regex(type, key1, key2) if mod.empty?
-      match_lines = search_xpath(type, key1, key2) if !mod.empty?
-      match_lines.each do |line|
-        line.unshift(chap_no, process, s_key)
-        csv << line
-        chap_no = ""
-        process = ""
-        s_key = ""
-      end if !match_lines.nil?
+      proc.call(search_info.xpath('PythonModule')[0].text.empty? ?  :search_regex : :search_xpath).each_with_index do |line, idx|
+        csv << (idx ==0 ? [chap_no, process, s_key] : [""]*3)+ line
+      end
     end
   end
 end
