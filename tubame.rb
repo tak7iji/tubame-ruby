@@ -10,23 +10,25 @@ def search_regex type, key1, key2
   r1 = Regexp.new(key2.empty? ? "[.]*" : key1)
   r2 = Regexp.new(key2.empty? ? key1 : key2)
 
-  match_lines = []
-  Dir.glob("**/#{type}").each do |file|
+  Dir.glob("**/#{type}").map do |file|
     lines = File.readlines(file)
-    count=0
+    next if lines.none? {|e| e.chomp.match(r1)}
+
     skip = false
     last = file
-    lines.each_with_index do |line, idx|
+    lines.map.with_index do |line, idx|
       skip = true if line.strip.start_with?("/*") && !line.strip.end_with?("*/")
-      skip = false if skip == true && lines[idx].strip.end_with?("*/")
+      skip = false if skip == true && line.strip.end_with?("*/")
       next if skip == true
+
       data = line.strip if line.match(r2) && !line.strip.start_with?("//")
-      line_no = idx + 1
-      match_lines.push([last.empty? ? "" : File.join($base_name, last), line_no, data.gsub("\"", "\"\"")]) if !data.nil?
-      last = "" if last == file && !data.nil?
-    end if lines.select{|e| e.chomp.match(r1)}.size > 0
-  end
-  match_lines
+      next if data.nil?
+
+      match_lines =[last.empty? ? "" : File.join($base_name, last), idx + 1, data.gsub("\"", "\"\"")]
+      last = "" if last == file
+      match_lines
+    end.compact
+  end.compact.flatten 1
 end
 
 def search_xpath type, key1, key2
