@@ -7,11 +7,8 @@ require 'stringio'
 $base_name = File.split(Dir.getwd)[1]
 
 def search_regex type, key1, key2
-  key2 = key1 if key2.empty?
-  key1 = "[.]*" if key1 == key2
-
-  r1 = Regexp.new(key1)
-  r2 = Regexp.new(key2)
+  r1 = Regexp.new(key2.empty? ? "[.]*" : key1)
+  r2 = Regexp.new(key2.empty? ? key1 : key2)
 
   match_lines = []
   Dir.glob("**/#{type}").each do |file|
@@ -38,7 +35,7 @@ def search_xpath type, key1, key2
     Nokogiri.XML(body).xpath(key1).map.with_index do |node, idx|
       line_no = node.line
       line = StringIO.new(body).readlines[line_no - 1].strip
-      [idx == 0 ? File.join($base_name, last) : ""] + [line_no, line]
+      [idx == 0 ? File.join($base_name, file) : ""] + [line_no, line]
     end
   end.flatten 1
 end
