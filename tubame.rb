@@ -11,17 +11,17 @@ def search_regex type, key1, key2
   r2 = Regexp.new(key2.empty? ? key1 : key2)
 
   Dir.glob("**/#{type}").map do |file|
-    lines = File.readlines(file)
+    lines = File.readlines(file).map{|e| e.strip}
     next if lines.none? {|e| e.chomp.match(r1)}
 
     skip = false
     last = file
     lines.map.with_index do |line, idx|
-      skip = true if line.strip.start_with?("/*") && !line.strip.end_with?("*/")
-      skip = false if skip == true && line.strip.end_with?("*/")
+      skip = true if line.start_with?("/*") && !line.end_with?("*/")
+      skip = false if skip == true && line.end_with?("*/")
       next if skip == true
 
-      data = line.strip if line.match(r2) && !line.strip.start_with?("//")
+      data = line if line.match(r2) && !line.start_with?("//")
       next if data.nil?
 
       match_lines =[last.empty? ? "" : File.join($base_name, last), idx + 1, data.gsub("\"", "\"\"")]
@@ -35,9 +35,8 @@ def search_xpath type, key1, key2
   Dir.glob("**/#{type}").map do |file|
     body = open(file, "rt") {|io| io.read}
     Nokogiri.XML(body).xpath(key1).map.with_index do |node, idx|
-      line_no = node.line
-      line = StringIO.new(body).readlines[line_no - 1].strip
-      [idx == 0 ? File.join($base_name, file) : ""] + [line_no, line]
+      line = body.split("\n")[node.line - 1].strip
+      [idx == 0 ? File.join($base_name, file) : "", node.line, line]
     end
   end.flatten 1
 end
