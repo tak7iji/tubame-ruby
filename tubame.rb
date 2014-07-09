@@ -34,14 +34,11 @@ end
 
 def search_xpath type, key1, key2
   Dir.glob("**/#{type}").map do |file|
-    last = file
     body = open(file, "rt") {|io| io.read}
-    Nokogiri.XML(body).xpath(key1).map do |node|
+    Nokogiri.XML(body).xpath(key1).map.with_index do |node, idx|
       line_no = node.line
       line = StringIO.new(body).readlines[line_no - 1].strip
-      match_lines = [last.empty? ? "" : File.join($base_name, last), line_no, line]
-      last = "" if last == file
-      match_lines
+      [idx == 0 ? File.join($base_name, last) : ""] + [line_no, line]
     end
   end.flatten 1
 end
