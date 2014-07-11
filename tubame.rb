@@ -13,7 +13,7 @@ def search_regex type, key1, key2
   r2 = Regexp.new(key2.empty? ? key1 : key2)
 
   proc = lambda do |file, r, e|
-    return C if !r.empty? && e[0].start_with?("/*") && !e[0].end_with?("*/")
+    return C if e[0].start_with?("/*") && !e[0].end_with?("*/")
     return E if !r.empty? && r.last == C && e[0].end_with?("*/")
     return C if !r.empty? && r.last == C
     return N if e[0].start_with?("//")
