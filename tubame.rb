@@ -2,32 +2,32 @@
 
 require 'nokogiri'
 require 'csv'
-require 'stringio'
 
 $base_name = File.split(Dir.getwd)[1]
+C=:c
+E=:e
+N=:n
 
 def search_regex type, key1, key2
   r1 = Regexp.new(key2.empty? ? "[.]*" : key1)
   r2 = Regexp.new(key2.empty? ? key1 : key2)
 
+  proc = lambda do |file, r, e|
+    return C if !r.empty? && e[0].start_with?("/*") && !e[0].end_with?("*/")
+    return E if !r.empty? && r.last == C && e[0].end_with?("*/")
+    return C if !r.empty? && r.last == C
+    return N if e[0].start_with?("//")
+    return [r.find{|s| s != C && s != E && s != N}.nil? ? File.join($base_name, file) : "", e[1] + 1, e[0].gsub("\"", "\"\"")] if e[0].match(r2)
+    N
+  end
+
   Dir.glob("**/#{type}").map do |file|
     lines = File.readlines(file).map{|e| e.strip}
     next if lines.none? {|e| e.chomp.match(r1)}
 
-    skip = false
-    last = file
-    lines.map.with_index do |line, idx|
-      skip = true if line.start_with?("/*") && !line.end_with?("*/")
-      skip = false if skip == true && line.end_with?("*/")
-      next if skip == true
-
-      data = line if line.match(r2) && !line.start_with?("//")
-      next if data.nil?
-
-      match_lines =[last.empty? ? "" : File.join($base_name, last), idx + 1, data.gsub("\"", "\"\"")]
-      last = "" if last == file
-      match_lines
-    end.compact
+    lines.each_with_index.inject([]) do |r, e|
+      r + [proc.call(file, r, e)]
+    end.compact.select{|s| s != C && s != E && s != N}
   end.compact.flatten 1
 end
 
@@ -41,7 +41,7 @@ def search_xpath type, key1, key2
   end.flatten 1
 end
 
-csv = CSV.open('result.csv', "wb", :encoding => 'Shift_JIS')
+csv = CSV.open('result_new.csv', "wb", :encoding => 'Shift_JIS')
 csv << ['ガイド章','検索手順','検索情報ID','ファイル名','行番号','コード内容']
 
 xml = Nokogiri.XML(open(ARGV[0]))
@@ -66,7 +66,7 @@ xml.remove_namespaces!.xpath('//ChapterCategoryRefKey').each do |e|
       end
 
       proc.call(search_info.xpath('PythonModule')[0].text.empty? ?  :search_regex : :search_xpath).each_with_index do |line, idx|
-        csv << (idx ==0 ? [chap_no, process, s_key] : [""]*3)+ line
+        csv << (idx ==0 ? [chap_no, process, s_key] : [""]*3)+line
       end
     end
   end
