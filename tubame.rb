@@ -41,7 +41,7 @@ def search_xpath type, key1, key2
   end.flatten 1
 end
 
-csv = CSV.open('result_new.csv', "wb", :encoding => 'Shift_JIS')
+csv = CSV.open('result.csv', "wb", :encoding => 'Shift_JIS')
 csv << ['ガイド章','検索手順','検索情報ID','ファイル名','行番号','コード内容']
 
 xml = Nokogiri.XML(open(ARGV[0]))
