@@ -13,11 +13,11 @@ def search_regex type, key1, key2
   r2 = Regexp.new(key2.empty? ? key1 : key2)
 
   proc = lambda do |file, r, e|
-    return C if e[0].start_with?("/*") && !e[0].end_with?("*/")
-    return E if !r.empty? && r.last == C && e[0].end_with?("*/")
-    return C if !r.empty? && r.last == C
-    return N if e[0].start_with?("//")
-    return [r.find{|s| s != C && s != E && s != N}.nil? ? File.join($base_name, file) : "", e[1] + 1, e[0].gsub("\"", "\"\"")] if e[0].match(r2)
+    (C if e[0].start_with?("/*") && !e[0].end_with?("*/"))||
+    (E if !r.empty? && r.last == C && e[0].end_with?("*/"))||
+    (C if !r.empty? && r.last == C)||
+    (N if e[0].start_with?("//"))||
+    ([r.find{|s| s != C && s != E && s != N}.nil? ? File.join($base_name, file) : "", e[1] + 1, e[0].gsub("\"", "\"\"")] if e[0].match(r2))||
     N
   end
 
