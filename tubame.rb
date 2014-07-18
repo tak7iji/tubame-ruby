@@ -12,21 +12,20 @@ def const_file cond, file
 end
 
 def search_regex type, key1, key2
-  r1 = Regexp.new(key2.empty? ? "[.]*" : key1)
-  r2 = Regexp.new(key2.empty? ? key1 : key2)
+  reg = (key2.empty? ? ["[.]*", key1] : [key1, key2]).map{|e| Regexp.new(e)}
 
-  h = lambda {|s| s.is_a?(Array)}
-  i = lambda {|r| r.any? && r.last == C}
-  f = lambda do |file, r, e|
+  h = ->(s) {s.is_a?(Array)}
+  i = ->(r) {r.any? && r.last == C}
+  f = ->(file, r, e) do
     (N if (e[0].start_with?("//")) || (i[r] && e[0].end_with?("*/")))||
     (C if (e[0].start_with?("/*") && !e[0].end_with?("*/")) || i[r])||
-    ([const_file(r.any?(&h), file), e[1] + 1, e[0].gsub('"', '""')] if e[0].match(r2))
+    ([const_file(r.any?(&h), file), e[1] + 1, e[0].gsub('"', '""')] if e[0].match(reg[1]))
   end.curry
 
   Dir.glob("**/#{type}").lazy.map do |file|
     g = f[file]
     lines = open(file).lazy.map(&:strip).to_a
-    next if lines.none? {|e| e.match(r1)}
+    next if lines.lazy.grep(reg[0]).to_a.empty?
 
     lines.lazy.each_with_index.inject([]) do |r, e|
       r + [g[r, e]]
