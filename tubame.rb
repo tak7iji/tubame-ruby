@@ -4,8 +4,6 @@ require 'nokogiri'
 require 'csv'
 
 $base_name = File.split(Dir.getwd)[1]
-C=:c
-N=:n
 
 def const_file cond, file
   cond ? "" : File.join($base_name, file)
@@ -14,18 +12,18 @@ end
 def search_regex type, key1, key2
   reg = (key2.empty? ? ["[.]*", key1] : [key1, key2]).map{|e| Regexp.new(e)}
 
-  h = ->(s) {s.is_a?(Array)}
-  i = ->(r) {r.any? && r.last == C}
+  h = -> s  {s.is_a?(Array)}
+  i = -> r  {r.any? && r.last == :C}
   f = ->(file, r, e) do
-    (N if (e[0].start_with?("//")) || (i[r] && e[0].end_with?("*/")))||
-    (C if (e[0].start_with?("/*") && !e[0].end_with?("*/")) || i[r])||
-    ([const_file(r.any?(&h), file), e[1] + 1, e[0].gsub('"', '""')] if e[0].match(reg[1]))
+    (:N if (e[0].start_with?("//")) || (i[r] && e[0].end_with?("*/")))||
+    (:C if (e[0].start_with?("/*") && !e[0].end_with?("*/")) || i[r])||
+    ([const_file(r.any?(&h), file), e[1] + 1, e[0].gsub('"', '""')] if e[0] =~ reg[1])
   end.curry
 
   Dir.glob("**/#{type}").lazy.map do |file|
     g = f[file]
     lines = open(file).lazy.map(&:strip).to_a
-    next if lines.lazy.grep(reg[0]).to_a.empty?
+    next if lines.lazy.grep(reg[0]).first.nil?
 
     lines.lazy.each_with_index.inject([]) do |r, e|
       r + [g[r, e]]
@@ -47,21 +45,18 @@ csv << ['ガイド章','検索手順','検索情報ID','ファイル名','行番
 
 xml = Nokogiri.XML(open(ARGV[0]))
 xml.remove_namespaces!.xpath('//ChapterCategoryRefKey').each do |e|
-  chap_no = e.previous_element.text
-  cat_key = e.text
-  kh_key  = xml.xpath("//Category[@categoryId='#{cat_key}']/KnowhowRefKey").text
+  kh_key  = xml.xpath("//Category[@categoryId='#{e.text}']/KnowhowRefKey").text
   next if kh_key.empty?
 
   xml.xpath("//KnowhowInfomation[@knowhowId='#{kh_key}']/CheckItem").each do |check_item|
     s_key = check_item.attr('searchRefKey')
     next if s_key.nil? || s_key.empty?
 
-    process = check_item.xpath('SearchProcess').text
     xml.xpath("//SearchInfomation[@searchInfoId='#{s_key}']").each do |s_info|
       args = %w(FileType SearchKey1 SearchKey2).map{|e| s_info.xpath(e)[0].text}
 
       (s_info.xpath('PythonModule')[0].text.empty? ? search_regex(*args) : search_xpath(*args)).each_with_index do |l, i|
-        csv << (i == 0 ? [chap_no, process, s_key] : [""]*3) + l
+        csv << (i == 0 ? [e.previous_element.text, check_item.xpath('SearchProcess').text, s_key] : [""]*3) + l
       end
     end
   end
