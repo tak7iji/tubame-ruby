@@ -52,12 +52,12 @@ xml.remove_namespaces!.xpath('//ChapterCategoryRefKey').each do |e|
     s_key = check_item.attr('searchRefKey')
     next if s_key.nil? || s_key.empty?
 
-    xml.xpath("//SearchInfomation[@searchInfoId='#{s_key}']").each do |s_info|
-      args = %w(FileType SearchKey1 SearchKey2).map{|e| s_info.xpath(e)[0].text}
+    s_info = xml.xpath("//SearchInfomation[@searchInfoId='#{s_key}']")[0]
+    next if s_info.nil?
+    args = %w(FileType SearchKey1 SearchKey2).map{|e| s_info.xpath(e)[0].text}
 
-      (s_info.xpath('PythonModule')[0].text.empty? ? search_regex(*args) : search_xpath(*args)).each_with_index do |l, i|
-        csv << (i == 0 ? [e.previous_element.text, check_item.xpath('SearchProcess').text, s_key] : [""]*3) + l
-      end
+    (s_info.xpath('PythonModule')[0].text.empty? ? search_regex(*args) : search_xpath(*args)).each_with_index do |l, i|
+      csv << (i == 0 ? [e.previous_element.text, check_item.xpath('SearchProcess').text, s_key] : [""]*3) + l
     end
   end
 end
